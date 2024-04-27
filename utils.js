@@ -1,3 +1,7 @@
+const fs = require("fs");
+const iconv = require("iconv-lite");
+const detectCharacterEncoding = require("detect-character-encoding");
+
 const DEBUG = true;
 
 const log = (...args) => {
