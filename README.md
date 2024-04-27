@@ -60,7 +60,3 @@ These commands start the client script in two separate terminals, connecting the
 
 - **Player Subtitle Change:**  
   When any user adds subtitles, it sends a `{"command":"PlayerSubtitleChanged","contents":"fileContents"}` JSON event to the other user. The receiving mpv project updates the subtitles with the provided content.
-
-### Context
-
-This project aims to facilitate simultaneous watching of TV series or movies for two people. It primarily uses the mpv player and some of its features. Additionally, it utilizes Socket.io to communicate and synchronize users.
