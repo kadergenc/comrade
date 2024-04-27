@@ -7,6 +7,7 @@ class Mpv {
   CALLBACKS = {};
   REQUEST_ID = 1;
   EVENT_CALLBACKS = {};
+  PROPERTY_AFFECTED = {};
 
   constructor(socketPath) {
     this.MPV_SERVER = net.createConnection(socketPath);
@@ -41,7 +42,7 @@ class Mpv {
   }
 
   // TODO(isamert): Handle mpv errors
-  sendCommand = async (command, args, callback) => {
+  sendCommand = async (command, args, options) => {
     if (!this.IS_MPV_SERVER_CONNECTED) {
       log("sendMpvCommand() :: Waiting connection to MPV server");
       await new Promise((resolve, reject) => {
@@ -53,8 +54,12 @@ class Mpv {
       });
     }
 
+    if (options?.affectsProperty) {
+      this.PROPERTY_AFFECTED[options.affectsProperty] = true;
+    }
+
     this.REQUEST_ID = this.REQUEST_ID + 1;
-    this.CALLBACKS[this.REQUEST_ID] = callback;
+    this.CALLBACKS[this.REQUEST_ID] = options?.callback;
 
     let commandObject;
     if (command === "observe_property") {
@@ -78,9 +83,23 @@ class Mpv {
 
   sendCommandAsync = (command, args) => {
     return new Promise((resolve, reject) => {
-      this.sendCommand(command, args, (data) => {
-        resolve(data);
+      this.sendCommand(command, args, {
+        callback: (data) => {
+          resolve(data);
+        },
       });
+    });
+  };
+
+  observeProperty = (property, callback) => {
+    return this.sendCommand("observe_property", [property], {
+      callback: (data) => {
+        if (this.PROPERTY_AFFECTED[property]) {
+          this.PROPERTY_AFFECTED[property] = false;
+          return;
+        }
+        callback(data);
+      },
     });
   };
 
@@ -89,19 +108,22 @@ class Mpv {
   };
 
   getCurrentSubtitlePath = async () => {
-    const subTitleId =
-      (await this.sendCommandAsync("get_property", ["sid"])).data;
+    const subTitleId = (await this.sendCommandAsync("get_property", ["sid"]))
+      .data;
     const subTitles = [];
-    const trackListCount =
-      (await this.sendCommandAsync("get_property", ["track-list/count"])).data;
+    const trackListCount = (
+      await this.sendCommandAsync("get_property", ["track-list/count"])
+    ).data;
     for (let i = 0; i < trackListCount; i++) {
       const trackType = await this.sendCommandAsync("get_property", [
         `track-list/${i}/type`,
       ]);
       if (trackType.data === "sub") {
-        const subTitlePath = (await this.sendCommandAsync("get_property", [
-          `track-list/${i}/external-filename`,
-        ])).data;
+        const subTitlePath = (
+          await this.sendCommandAsync("get_property", [
+            `track-list/${i}/external-filename`,
+          ])
+        ).data;
         subTitles.push(subTitlePath);
       }
     }
