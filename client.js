@@ -1,17 +1,13 @@
 const io = require("socket.io-client");
 const socket = io("http://localhost:3000");
-const { log, readTextFile } = require("./utils");
+const { log, readTextFile, createTempFile } = require("./utils");
 const { Mpv } = require("./mpv");
-const fs = require("fs");
 
-const mpvSocketPath = process.argv.find((arg) =>
-  arg.startsWith("--mpv-socket=")
-)
+const mpvSocketPath = process.argv
+  .find((arg) => arg.startsWith("--mpv-socket="))
   .replace("--mpv-socket=", "");
 
 const mpv = new Mpv(mpvSocketPath);
-
-let subAdded = false;
 
 const post = (cmd) => {
   log(`POST: (${JSON.stringify(cmd)})`);
@@ -31,20 +27,15 @@ socket.on("message", (data) => {
   } else if (data.command === "PlayerSync") {
     mpv.sendCommand("set_property", ["time-pos", data.timePos]);
   } else if (data.command === "PlayerSubtitleChanged") {
-    const filePath = __dirname + "/subFile.txt";
-    fs.writeFileSync(filePath, data.contents);
-    mpv.sendCommand("sub-add", [filePath]);
-    subAdded = true;
+    mpv.sendCommand("sub-add", [createTempFile(data.contents)], {
+      affectsProperty: "sid",
+    });
   }
 });
 
 (async () => {
   // Observe subtitle changes and detect current subtitle then send it to server with subtitle file content
-  await mpv.sendCommand("observe_property", ["sid"], async (_data) => {
-    if (subAdded) {
-      subAdded = false;
-      return;
-    }
+  await mpv.observeProperty("sid", async (_data) => {
     const subtitlePath = (await mpv.getCurrentSubtitlePath())?.replace(
       "file://",
       "",
@@ -64,7 +55,7 @@ socket.on("message", (data) => {
   });
 
   // Pause/Resume on pause/resume events
-  await mpv.sendCommand("observe_property", ["pause"], (data) => {
+  await mpv.observeProperty("pause", (data) => {
     if (data.data) {
       post({ command: "PlayerPause" });
     } else {
