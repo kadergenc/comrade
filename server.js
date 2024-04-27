@@ -1,22 +1,32 @@
 const express = require("express");
 const http = require("http");
 const socketIO = require("socket.io");
+const { log } = require("./utils");
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIO(server);
 
+const connectedClients = new Map();
+
 io.on("connection", (socket) => {
-  console.log("Connected to server");
+  connectedClients.set(socket.id, socket);
+
+  log(`A client has connected to server with socket Id: ${socket.id}`);
 
   socket.on("message", (data) => {
-    console.log(`Message: ${data}`);
+    log(`Message from client with Id ${socket.id}: ${JSON.stringify(data)}`);
 
-    io.emit("message", data);
+    connectedClients.forEach((clientSocket, id) => {
+      if (id !== socket.id) {
+        clientSocket.emit("message", { ...data, socketId: socket.id });
+      }
+    });
   });
 
   socket.on("disconnect", () => {
-    console.log("User disconnect");
+    log(`Client disconnect, socket id: ${socket.id}`);
+    connectedClients.delete(socket.id);
   });
 });
 

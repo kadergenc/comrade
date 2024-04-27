@@ -1,8 +1,34 @@
+const io = require("socket.io-client");
+const socket = io("http://localhost:3000");
 const { log, readTextFile } = require("./utils");
-const mpv = require("./mpv");
+const { Mpv } = require("./mpv");
+
+const mpvSocketPath = process.argv.find((arg) =>
+  arg.startsWith("--mpv-socket=")
+)
+  .replace("--mpv-socket=", "");
+
+const mpv = new Mpv(mpvSocketPath);
+
 const post = (cmd) => {
   log(`POST: (${JSON.stringify(cmd)})`);
+  socket.emit("message", cmd);
 };
+
+socket.on("connect", () => {
+  log(`Connected to server with client Id: ${socket.id}`);
+});
+
+socket.on("message", (data) => {
+  log(`Message from server: ${JSON.stringify(data)}`);
+  if (data.command === "PlayerPause") {
+    mpv.sendCommand("set_property", ["pause", true]);
+  } else if (data.command === "PlayerResume") {
+    mpv.sendCommand("set_property", ["pause", false]);
+  } else if (data.command === "PlayerSync") {
+    mpv.sendCommand("set_property", ["time-pos", data.timePos]);
+  }
+});
 
 (async () => {
   // Observe subtitle changes and detect current subtitle then send it to server with subtitle file content
