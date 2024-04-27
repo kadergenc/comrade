@@ -1,4 +1,7 @@
 const net = require("net");
+const fs = require("fs");
+const iconv = require("iconv-lite");
+const detectCharacterEncoding = require('detect-character-encoding');
 
 const DEBUG=true
 
@@ -95,25 +98,67 @@ MPV_SERVER.on("data", function (data) {
     });
 });
 
-(async ()=>{
-    await sendMpvCommand('set_property',['pause',true])
-    await sendMpvCommand('get_property',['time-pos'])
-    // await sendMpvCommand('get_property',['time-pos'],100)
-    await sendMpvCommand('observe_property',['pause'],(data)=>{
-        if (data.data){
-            post('PlayerPause')
-        }else {
-            post('PlayerResume')
+const getMpvCurrentSubtitlePath=async ()=>{
+    const subTitleId=(await sendMPVCommandAsync('get_property',['sid'])).data;
+    const subTitles=[]
+    const trackListCount=(await sendMPVCommandAsync('get_property',['track-list/count'])).data;
+    for (let i =0; i<trackListCount ; i++){
+        const trackType= await sendMPVCommandAsync('get_property',[`track-list/${i}/type`])
+        if (trackType.data==='sub'){
+            const subTitlePath=(await sendMPVCommandAsync('get_property',[`track-list/${i}/external-filename`])).data;
+            subTitles.push(subTitlePath)
         }
+    }
+    return subTitles[subTitleId-1]
+}
+
+/*
+ * Read file given paths content as text. Automatically detects the encoding of the file
+ */
+const readTextFile=(path)=>{
+    const contents = fs.readFileSync(path);
+    const encoding=detectCharacterEncoding(contents).encoding
+
+    return iconv.decode(contents,encoding)
+}
+
+(async ()=>{
+    // Observe subtitle changes and detect current subtitle then send it to server with subtitle file content
+    await sendMpvCommand('observe_property',['sid'],async (_data)=>{
+        const subtitlePath=(await getMpvCurrentSubtitlePath()).replace('file://','');
+        const content=readTextFile(subtitlePath)
+        post({command: "PlayerSubtitleChanged", contents:content})
     })
-    await sendMpvCommand('observe_property',['seeking'])
-    await sendMpvCommand('get_property',['time-pos'],(data)=>{
-        console.log('function',data.data)
-    })
-    observerMPVEvent('seek',async (data)=>{
-     const seekTimePos=  await sendMPVCommandAsync('get_property',['time-pos'])
-        post({command:'PlayerSeek',timePos:seekTimePos.data})
-    })
-    const timePos = await sendMPVCommandAsync('get_property',['time-pos'])
-    console.log('Time Pos: ',timePos)
+
+    // await sendMpvCommand('set_property',['pause',true])
+    // await sendMpvCommand('get_property',['time-pos'])
+    // await sendMpvCommand('get_property',['time-pos'],100)
+    // await sendMpvCommand('observe_property',['pause'],(data)=>{
+    //     if (data.data){
+    //         post('PlayerPause')
+    //     }else {
+    //         post('PlayerResume')
+    //     }
+    // })
+    // --sub-file=<filename>
+    // await sendMpvCommand('observe_property',['seeking'])
+    // mp.get_property_native("track-list/2/external-filename")
+
+    // await sendMpvCommand('get_property',['time-pos'],(data)=>{
+    //     console.log('function',data.data)
+    // });
+    // await sendMpvCommand('get_property',['track-list/2/external-filename'],(data)=>{
+    //     console.log('track property',data)
+    // });
+    // await sendMpvCommand('observe_property',['sub-file-paths'],async (data)=>{
+    //     await sendMpvCommand('get_property',['sub-file-paths'],(data)=>{
+    //         console.log('sub-file-paths',data)
+    //     });
+    // })
+    // observerMPVEvent('seek',async (data)=>{
+    //  const seekTimePos=  await sendMPVCommandAsync('get_property',['time-pos'])
+    //     post({command:'PlayerSeek',timePos:seekTimePos.data})
+    // })
+    // const timePos = await sendMPVCommandAsync('get_property',['time-pos'])
+    // console.log('Time Pos: ',timePos)
 })();
