@@ -1,5 +1,5 @@
 # Comrade
-Comrade is a synchronization program that allows two people to watch TV series or movies simultaneously. It primarily leverages the [mpv player](https://mpv.io/) and some of its specific features. It uses Socket.io to communicate and synchronize users.
+Comrade is a synchronization program that allows a few people to watch TV series or movies simultaneously. It primarily leverages the [mpv player](https://mpv.io/) and some of its specific features. It uses Socket.io to communicate and synchronize users.
 
 ## Features
 
@@ -56,7 +56,7 @@ These commands start the client script in two separate terminals, connecting the
   When any user resumes playback, it sends a `{"command":"PlayerResume"}` JSON event to the other user. The receiving mpv project continues playback.
 
 - **Player Sync:**  
-  When any user moves to a different minute of the program and presses the 'k' key, it sends a `{"command":"PlayerSeek","timePos":195.875}` JSON event to the other user. The receiving mpv project jumps to the specified time position.
+  When any user moves to a different minute of the program or presses the 'k' key, it sends a `{"command":"PlayerSeek","timePos":195.875}` JSON event to the other user. The receiving mpv project jumps to the specified time position.
 
 - **Player Subtitle Change:**  
   When any user adds subtitles, it sends a `{"command":"PlayerSubtitleChanged","contents":"fileContents"}` JSON event to the other user. The receiving mpv project updates the subtitles with the provided content.

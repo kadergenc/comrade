@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
+  "author": "kadergenc",
   "license": "ISC",
   "dependencies": {
     "detect-character-encoding": "^0.9.0",
