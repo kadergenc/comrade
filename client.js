@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 const io = require("socket.io-client");
-const socket = io("http://localhost:3000");
 const { spawn } = require("child_process");
 const { log, readTextFile, createTempFile } = require("./utils");
 const { Mpv } = require("./mpv");
@@ -20,7 +19,11 @@ if (!mpvSocketPath) {
   args.unshift(`${IPC_SERVER_PARAM_PREFIX}${mpvSocketPath}`);
 }
 
-const mpvProcess = spawn("mpv", args, { stdio: "inherit" });
+const mpvProcess = spawn(
+  "mpv",
+  args.filter((x) => !x.includes("--comrade")),
+  { stdio: "inherit" },
+);
 mpvProcess.on("close", () => {
   process.exit(1);
 });
@@ -32,6 +35,13 @@ mpvProcess.on("spawn", async () => {
 
 async function startComradeClient(socketPath) {
   const mpv = new Mpv(socketPath);
+
+  const comradeServer =
+    args
+      .find((arg) => arg.startsWith("--comrade-server="))
+      ?.replace("--comrade-server=", "") ?? "localhost:3000";
+
+  const socket = io(comradeServer);
 
   const post = (cmd) => {
     log(`POST: (${JSON.stringify(cmd)})`);

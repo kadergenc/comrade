@@ -37,6 +37,12 @@ For example, if you want to start a second instance of mpv on the same computer,
 
 By default, comrade opens mpv instance with `/tmp/comrade-socket` socket file.
 
+To point comrade client to a specific comrade server (other than `localhost:3000`), use the following:
+
+```shell
+./client.js --comrade-server=<YOUR-SERVER-ADDRESS> # Arguments not starting with --comrade are passed to mpv as-is
+```
+
 ### Detailed Explanations
 
 - **Player Pause:**
