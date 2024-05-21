@@ -1,39 +1,62 @@
+#!/usr/bin/env node
+
 const io = require("socket.io-client");
 const socket = io("http://localhost:3000");
+const { spawn } = require("child_process");
 const { log, readTextFile, createTempFile } = require("./utils");
 const { Mpv } = require("./mpv");
 
-const mpvSocketPath = process.argv
-  .find((arg) => arg.startsWith("--mpv-socket="))
-  .replace("--mpv-socket=", "");
+const DEFAULT_IPC_SERVER_PATH = "/tmp/comrade-socket";
+const IPC_SERVER_PARAM_PREFIX = "--input-ipc-server=";
 
-const mpv = new Mpv(mpvSocketPath);
+const args = process.argv.slice(2);
 
-const post = (cmd) => {
-  log(`POST: (${JSON.stringify(cmd)})`);
-  socket.emit("message", cmd);
-};
+let mpvSocketPath = args
+  .find((arg) => arg.startsWith(IPC_SERVER_PARAM_PREFIX))
+  ?.replace(IPC_SERVER_PARAM_PREFIX, "");
 
-socket.on("connect", () => {
-  log(`Connected to server with client Id: ${socket.id}`);
+if (!mpvSocketPath) {
+  mpvSocketPath = DEFAULT_IPC_SERVER_PATH;
+  args.unshift(`${IPC_SERVER_PARAM_PREFIX}${mpvSocketPath}`);
+}
+
+const mpvProcess = spawn("mpv", args, { stdio: "inherit" });
+mpvProcess.on("close", () => {
+  process.exit(1);
 });
 
-socket.on("message", (data) => {
-  log(`Message from server: ${JSON.stringify(data)}`);
-  if (data.command === "PlayerPause") {
-    mpv.sendCommand("set_property", ["pause", true]);
-  } else if (data.command === "PlayerResume") {
-    mpv.sendCommand("set_property", ["pause", false]);
-  } else if (data.command === "PlayerSync") {
-    mpv.sendCommand("set_property", ["time-pos", data.timePos]);
-  } else if (data.command === "PlayerSubtitleChanged") {
-    mpv.sendCommand("sub-add", [createTempFile(data.contents)], {
-      affectsProperty: "sid",
-    });
-  }
+mpvProcess.on("spawn", async () => {
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+  await startComradeClient(mpvSocketPath);
 });
 
-(async () => {
+async function startComradeClient(socketPath) {
+  const mpv = new Mpv(socketPath);
+
+  const post = (cmd) => {
+    log(`POST: (${JSON.stringify(cmd)})`);
+    socket.emit("message", cmd);
+  };
+
+  socket.on("connect", () => {
+    log(`Connected to server with client Id: ${socket.id}`);
+  });
+
+  socket.on("message", (data) => {
+    log(`Message from server: ${JSON.stringify(data)}`);
+    if (data.command === "PlayerPause") {
+      mpv.sendCommand("set_property", ["pause", true]);
+    } else if (data.command === "PlayerResume") {
+      mpv.sendCommand("set_property", ["pause", false]);
+    } else if (data.command === "PlayerSync") {
+      mpv.sendCommand("set_property", ["time-pos", data.timePos]);
+    } else if (data.command === "PlayerSubtitleChanged") {
+      mpv.sendCommand("sub-add", [createTempFile(data.contents)], {
+        affectsProperty: "sid",
+      });
+    }
+  });
+
   // Observe subtitle changes and detect current subtitle then send it to server with subtitle file content
   await mpv.observeProperty("sid", async (_data) => {
     const subtitlePath = (await mpv.getCurrentSubtitlePath())?.replace(
@@ -70,4 +93,4 @@ socket.on("message", (data) => {
     ]);
     post({ command: "PlayerSeek", timePos: seekTimePos.data });
   });
-})();
+}

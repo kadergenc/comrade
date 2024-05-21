@@ -8,7 +8,6 @@ Comrade is a synchronization program that allows a few people to watch TV series
 - **Player Sync:** Users can synchronize by moving to a different minute of the program and pressing the 'k' key.
 - **Player Subtitle Change:** Users can change subtitles and relay this change to the other user.
 
-
 ## Usage
 
 ### Installation and Setup
@@ -17,46 +16,37 @@ Comrade is a synchronization program that allows a few people to watch TV series
 To run the server file:
 
 ```shell
-node server.js
-```
-
-#### Open File with Mpv
-To open a file with mpv:
-
-```shell
-mpv --input-ipc-server=/tmp/mpv-socket '/Users/kader.genc/Downloads/BigBuckBunny_320x180.mp4'
-```
-
-#### Open Second File with Mpv
-To open a second mpv file:
-
-```shell
-mpv --input-ipc-server=/tmp/mpv-socket1 '/Users/kader.genc/Downloads/BigBuckBunny_320x180.mp4'
+./server.js # OR node server.js
 ```
 
 #### Start Client
-In two different terminals:
+Client starts mpv with itself. You can simply pass any parameter to client and it'll pass them to mpv.
 
 ```shell
-node client.js --mpv-socket=/tmp/mpv-socket
-```
-and 
-```shell
-node client.js --mpv-socket=/tmp/mpv-socket1
+./client.js movie-file.mkv # OR node client.js movie-file.mkv
 ```
 
-These commands start the client script in two separate terminals, connecting them to the respective mpv instances via their IPC servers.
+This will start mpv with the `movie-file.mkv` and comrade will listen all changes from mpv.
+
+For example, if you want to start a second instance of mpv on the same computer, you can do the following:
+
+
+```shell
+./client.js --input-ipc-server=/tmp/mpv-socket movie-file.mkv
+```
+
+By default, comrade opens mpv instance with `/tmp/comrade-socket` socket file.
 
 ### Detailed Explanations
 
-- **Player Pause:**  
+- **Player Pause:**
   When any user pauses the program, it sends a `{"command":"PlayerPause"}` JSON event to the other user. The receiving mpv project will stop.
 
-- **Player Resume:**  
+- **Player Resume:**
   When any user resumes playback, it sends a `{"command":"PlayerResume"}` JSON event to the other user. The receiving mpv project continues playback.
 
-- **Player Sync:**  
+- **Player Sync:**
   When any user moves to a different minute of the program or presses the 'k' key, it sends a `{"command":"PlayerSeek","timePos":195.875}` JSON event to the other user. The receiving mpv project jumps to the specified time position.
 
-- **Player Subtitle Change:**  
+- **Player Subtitle Change:**
   When any user adds subtitles, it sends a `{"command":"PlayerSubtitleChanged","contents":"fileContents"}` JSON event to the other user. The receiving mpv project updates the subtitles with the provided content.
