@@ -1,6 +1,7 @@
 const fs = require("fs");
 const os = require("os");
 const iconv = require("iconv-lite");
+const path = require("path");
 const detectCharacterEncoding = require("detect-character-encoding");
 
 const DEBUG = true;
