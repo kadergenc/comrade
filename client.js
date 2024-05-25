@@ -5,8 +5,12 @@ const { spawn } = require("child_process");
 const { log, readTextFile, createTempFile } = require("./utils");
 const { Mpv } = require("./mpv");
 
+// * Constants
+
 const DEFAULT_IPC_SERVER_PATH = "/tmp/comrade-socket";
 const IPC_SERVER_PARAM_PREFIX = "--input-ipc-server=";
+
+// * Args
 
 const args = process.argv.slice(2);
 
@@ -19,19 +23,29 @@ if (!mpvSocketPath) {
   args.unshift(`${IPC_SERVER_PARAM_PREFIX}${mpvSocketPath}`);
 }
 
-const mpvProcess = spawn(
-  "mpv",
-  args.filter((x) => !x.includes("--comrade")),
-  { stdio: "inherit" },
-);
-mpvProcess.on("close", () => {
-  process.exit(1);
-});
+const shouldStartMpv = !args?.find((arg) => arg === "--comrade-no-mpv");
 
-mpvProcess.on("spawn", async () => {
-  await new Promise((resolve) => setTimeout(resolve, 2000));
-  await startComradeClient(mpvSocketPath);
-});
+// * Functions
+
+function startMpvProcess() {
+  return new Promise((resolve, reject) => {
+    const mpvProcess = spawn(
+      "mpv",
+      args.filter((x) => !x.includes("--comrade")),
+      { stdio: "inherit" },
+    );
+
+    mpvProcess.on("close", () => {
+      process.exit(1);
+    });
+
+    mpvProcess.on("spawn", async () => {
+      // Wait a little bit before starting the client
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      resolve();
+    });
+  });
+}
 
 async function startComradeClient(socketPath) {
   const mpv = new Mpv(socketPath);
@@ -63,6 +77,10 @@ async function startComradeClient(socketPath) {
     } else if (data.command === "PlayerSubtitleChanged") {
       mpv.sendCommand("sub-add", [createTempFile(data.contents)], {
         affectsProperty: "sid",
+      });
+    } else if (data.command === "LoadFile") {
+      mpv.sendCommand("loadfile", [data.file], {
+        affectsProperty: "path",
       });
     }
   });
@@ -96,6 +114,13 @@ async function startComradeClient(socketPath) {
     }
   });
 
+  // Capture file-loaded
+  await mpv.observeProperty("path", (data) => {
+    if (data?.data?.startsWith("http")) {
+      post({ command: "LoadFile", file: data.data });
+    }
+  });
+
   // Seek on seek event
   mpv.observeEvent("seek", async (data) => {
     const seekTimePos = await mpv.sendCommandAsync("get_property", [
@@ -104,3 +129,15 @@ async function startComradeClient(socketPath) {
     post({ command: "PlayerSeek", timePos: seekTimePos.data });
   });
 }
+
+// * Main
+
+(async () => {
+  if (shouldStartMpv) {
+    console.log(">> Starting mpv.");
+    await startMpvProcess();
+  }
+
+  console.log(`>> Starting ${mpvSocketPath}`);
+  await startComradeClient(mpvSocketPath);
+})();
