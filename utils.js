@@ -8,7 +8,7 @@ const DEBUG = true;
 
 const log = (...args) => {
   if (DEBUG === true) {
-    console.log(">> ", ...args);
+    console.log(">>", new Date().toISOString(), ...args);
   }
 };
 
