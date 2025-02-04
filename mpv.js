@@ -94,7 +94,12 @@ class Mpv {
   observeProperty = (property, callback) => {
     return this.sendCommand("observe_property", [property], {
       callback: (data) => {
-        if (this.PROPERTY_AFFECTED[property]) {
+        // Check if we need to skip this event, and if so, make sure
+        // event contains some data to ensure it is really the event
+        // that we want to skip. mpv sometimes sends duplicate
+        // property-change events without any data. Not sure if this
+        // solution fits all cases but seems to work fine.
+        if (this.PROPERTY_AFFECTED[property] && data.data) {
           this.PROPERTY_AFFECTED[property] = false;
           return;
         }
